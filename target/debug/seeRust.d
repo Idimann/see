@@ -1,1 +1,0 @@
-/home/lol/Projects/seeRust/target/debug/seeRust: /home/lol/Projects/seeRust/src/buffer/bindr.rs /home/lol/Projects/seeRust/src/buffer.rs /home/lol/Projects/seeRust/src/main.rs /home/lol/Projects/seeRust/src/settings.rs
