@@ -1,9 +1,14 @@
 extern crate pancurses;
-use buffer::bindr;
+use std::cell::RefCell;
+use std::env;
+use std::rc::Rc;
+
 use pancurses::*;
 
 mod buffer;
+mod run;
 mod settings;
+mod window;
 
 fn init_colors() {
     if has_colors() {
@@ -12,41 +17,59 @@ fn init_colors() {
     }
 }
 
+fn init_bufs(
+    buffers: &mut Vec<Rc<RefCell<buffer::Buf>>>,
+    file: Option<String>,
+    flags: buffer::Flags,
+) {
+    buffers.push(Rc::new(RefCell::new(match file {
+        Some(n) => buffer::Buf::new_load(flags, Box::new(buffer::bindr::FileBind { file: n })),
+        None => buffer::Buf::new(
+            "No file provided",
+            flags,
+            Box::new(buffer::bindr::DefaultBind {}),
+        ),
+    })));
+}
+
+fn init_windows(
+    buffers: &Vec<Rc<RefCell<buffer::Buf>>>,
+    windows: &mut Vec<window::Win>,
+    scr: &Window,
+) {
+    let (y_size, x_size) = scr.get_max_yx();
+    let (y_pos, x_pos) = scr.get_beg_yx();
+
+    windows.push(window::Win::new(
+        match scr.subwin(y_size, x_size, y_pos, x_pos) {
+            Ok(x) => x,
+            Err(_) => return,
+        },
+        match buffers.first() {
+            Some(x) => x.clone(),
+            None => return,
+        },
+    ));
+}
+
 fn main() {
-    let window = initscr();
+    let stdscr = initscr();
+    noecho();
+
     if settings::COLOR {
         init_colors();
     }
 
-    let mut test: buffer::Buf<buffer::bindr::DefaultBind> =
-    buffer::Buf::new("OMG", buffer::Flags::NONE, buffer::bindr::DefaultBind {});
+    let mut buffers: Vec<Rc<RefCell<buffer::Buf>>> = Vec::new();
+    let mut windows: Vec<window::Win> = Vec::new();
 
-    let test2: buffer::Buf<buffer::bindr::FileBind> =
-    buffer::Buf::new("OMG", buffer::Flags::NONE, buffer::bindr::FileBind {});
+    init_bufs(&mut buffers, env::args().nth(1), buffer::Flags::none);
+    init_windows(&mut buffers, &mut windows, &stdscr);
 
-    test.attrs.push(buffer::Attr {
-        color: -1,
-        flags: A_BOLD,
-        size: 5,
-    });
+    let _ = run::run(&mut buffers, &mut windows);
 
-    test.write(&window);
-    test2.write(&window);
-    window.refresh();
-
-    window.keypad(true);
-    noecho();
-    loop {
-        match window.getch() {
-            Some(Input::Character(c)) => {
-                window.addch(c);
-            }
-            Some(Input::KeyDC) => break,
-            Some(input) => {
-                window.addstr(&format!("{:?}", input));
-            }
-            None => (),
-        }
+    for win in windows {
+        win.window.delwin();
     }
 
     endwin();
