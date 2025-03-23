@@ -21,7 +21,7 @@ impl Display for BindErr {
 
 pub trait Bindr {
     fn save(&self, buf: &String) -> Result<(), BindErr>;
-    fn load(&self, but: &mut String) -> Result<(), BindErr>;
+    fn load(&self, but: &mut Vec<String>) -> Result<(), BindErr>;
 }
 
 pub struct DefaultBind;
@@ -31,7 +31,7 @@ impl Bindr for DefaultBind {
         return Ok(());
     }
 
-    fn load(&self, _: &mut String) -> Result<(), BindErr> {
+    fn load(&self, _: &mut Vec<String>) -> Result<(), BindErr> {
         return Ok(());
     }
 }
@@ -53,19 +53,22 @@ impl Bindr for FileBind {
         };
     }
 
-    //This is cursed
-    fn load(&self, mut buf: &mut String) -> Result<(), BindErr> {
+    fn load(&self, buf: &mut Vec<String>) -> Result<(), BindErr> {
         let mut file = match File::open(self.file.to_string()) {
             Ok(x) => x,
             Err(_) => return Err(BindErr::FileOpen),
         };
 
-        return match file.read_to_string(&mut buf) {
+        let mut text = String::new();
+        match file.read_to_string(&mut text) {
             Ok(len) => match len {
-                0 => Err(BindErr::FileLoad),
-                _ => Ok(()),
+                0 => return Err(BindErr::FileLoad),
+                _ => {
+                    *buf = text.split_inclusive('\n').map(|x| x.to_string()).collect();
+                    return Ok(());
+                }
             },
-            Err(_) => Err(BindErr::FileLoad),
+            Err(_) => return Err(BindErr::FileLoad),
         };
     }
 }

@@ -19,16 +19,20 @@ pub struct Attr {
 }
 
 pub struct Buf {
-    pub content: String,
-    pub attrs: Vec<Attr>,
-    pub flags: Flags,
-    pub bind: Box<dyn bindr::Bindr>,
+    pub content: Vec<String>,
+    attrs: Vec<Attr>,
+    flags: Flags,
+    bind: Box<dyn bindr::Bindr>,
 }
 
 impl Buf {
     pub fn new(content: &str, flag: Flags, bin: Box<dyn bindr::Bindr>) -> Self {
         return Buf {
-            content: String::from(content),
+            content: content
+                .to_string()
+                .split_inclusive('\n')
+                .map(|x| x.to_string())
+                .collect(),
             attrs: vec![],
             flags: flag,
             bind: bin,
@@ -37,7 +41,7 @@ impl Buf {
 
     pub fn new_load(flag: Flags, bin: Box<dyn bindr::Bindr>) -> Self {
         let mut ret = Buf {
-            content: String::from(""),
+            content: vec![String::from("")],
             attrs: vec![],
             flags: flag,
             bind: bin,
@@ -45,7 +49,10 @@ impl Buf {
         return match ret.bind.load(&mut ret.content) {
             Ok(_) => ret,
             Err(err) => {
-                ret.content = String::from(format!("Can't read from source, Error: {}", err));
+                ret.content = vec![String::from(format!(
+                    "Can't read from source, Error: {}",
+                    err
+                ))];
                 ret
             }
         };
@@ -53,8 +60,10 @@ impl Buf {
 
     //Unicode baby!!!!! (27 lines only btw) (don't touch the iterator shit, that took forever)
     pub fn write(&self, win: &Window, pos: usize) {
-        let mut iter = self.content.char_indices();
-        let mut start = match iter.nth(pos) {
+        let text = self.content[pos..].join("");
+
+        let mut iter = text.char_indices();
+        let mut start = match iter.next() {
             Some((x, _)) => x,
             None => return,
         };
@@ -64,11 +73,11 @@ impl Buf {
             win.color_set(c.color);
             match iter.nth(c.size - 1) {
                 Some((end, _)) => {
-                    win.addstr(&self.content[start..end]);
+                    win.addstr(&text[start..end]);
                     start = end;
                 }
                 None => {
-                    win.addstr(&self.content[start..]);
+                    win.addstr(&text[start..]);
                     start = self.content.len();
                     break;
                 }
@@ -79,7 +88,7 @@ impl Buf {
             win.color_set(-1);
             win.attrset(A_NORMAL);
 
-            win.addstr(&self.content[start..]);
+            win.addstr(&text[start..]);
         }
     }
 }
