@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2.9.0"
+ctrlc = "3.4.5"
 pancurses = "0.17.0"

@@ -2,6 +2,7 @@ extern crate pancurses;
 use std::cell::RefCell;
 use std::env;
 use std::rc::Rc;
+use ctrlc;
 
 use pancurses::*;
 
@@ -9,6 +10,8 @@ mod buffer;
 mod run;
 mod settings;
 mod window;
+mod mode;
+mod movement;
 
 fn init_colors() {
     if has_colors() {
@@ -56,6 +59,7 @@ fn main() {
     let stdscr = initscr();
     noecho();
 
+
     if settings::COLOR {
         init_colors();
     }
@@ -63,10 +67,18 @@ fn main() {
     let mut buffers: Vec<Rc<RefCell<buffer::Buf>>> = Vec::new();
     let mut windows: Vec<window::Win> = Vec::new();
 
+    match ctrlc::set_handler(|| {
+        mode::ctrl_c();
+    }) {
+        Ok(_) => (),
+        Err(x) => panic!("{:?}", x)
+    };
+
     init_bufs(&mut buffers, env::args().nth(1), buffer::Flags::none);
     init_windows(&mut buffers, &mut windows, &stdscr);
 
-    let _ = run::run(&mut buffers, &mut windows);
+    stdscr.keypad(true);
+    let _ = run::run(&stdscr, &mut buffers, &mut windows);
 
     for win in windows {
         win.window.delwin();

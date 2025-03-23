@@ -16,26 +16,25 @@ impl Display for RunErr {
     }
 }
 
-pub fn run(bufs: &mut Vec<Rc<RefCell<Buf>>>, wins: &mut Vec<Win>) -> Result<(), RunErr> {
+pub fn run(
+    std: &Window,
+    bufs: &mut Vec<Rc<RefCell<Buf>>>,
+    wins: &mut Vec<Win>,
+) -> Result<(), RunErr> {
     'mainLoop: loop {
-        for win in wins.iter_mut() {
+        for win in wins.iter() {
             win.render();
+        }
 
-            win.window.keypad(true);
-            match win.window.getch() {
-                Some(Input::Character('q')) => {
-                    break 'mainLoop;
-                },
-                Some(Input::Character('u')) => { win.move_up(); },
-                Some(Input::Character('d')) => { win.move_down(); },
-                Some(Input::Character('b')) => { win.move_backward(); },
-                Some(Input::Character('f')) => { win.move_forward(); },
-                // Some(Input::Character(x)) => {
-                //     win.buf.borrow_mut().content.push(x);
-                // },
-                Some(_) => (),
-                None => (),
-            };
+        let input = match std.getch() {
+            Some(x) => x,
+            None => continue,
+        };
+
+        for win in wins.iter_mut() {
+            if win.run(input) {
+                break 'mainLoop;
+            }
         }
     }
 
