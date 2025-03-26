@@ -1,20 +1,25 @@
+use crate::buffer;
 use crate::buffer::Buf;
+use crate::colors;
 use crate::mode;
 use crate::mode::Mod;
 use pancurses::*;
 use std::cell::RefCell;
+use std::cmp::max;
+use std::cmp::min;
 use std::rc::Rc;
 
-const DEFAULT_MODE: Mod = mode::select;
+const DEFAULT_MODE: mode::Select = mode::Select;
 
-// This is stupid
 pub struct Win {
     pub window: Window,
     pub buf: Rc<RefCell<Buf>>,
-    pub drawing_pos: usize,
+    pub drawing_pos: (usize, usize),
+    pub last_pos: (usize, usize),
     pub pos: (usize, usize),
     pub pos_x: usize,
-    pub mode: Mod,
+    pub mode: Box<dyn Mod>,
+    pub redraw: bool,
 }
 
 impl Win {
@@ -22,27 +27,105 @@ impl Win {
         return Win {
             window: win,
             buf: bu,
-            drawing_pos: 0,
+            drawing_pos: (0, 0),
+            last_pos: (0, 0),
             pos: (0, 0),
             pos_x: 0,
-            mode: mode::insert,
+            mode: Box::new(mode::Insert),
+            redraw: true,
         };
     }
 
-    pub fn render(&self) {
-        // self.window.mv(0, 0);
-        self.window.clear();
-        self.buf.borrow().write(&self.window, self.drawing_pos);
-        self.window
-            .mv((self.pos.1 - self.drawing_pos) as i32, self.pos.0 as i32);
+    pub fn render(&mut self) {
+        if self.redraw || true {
+            let mut buf = self.buf.borrow_mut();
+            buf.attrs.clear();
+
+            let mut top = self.pos;
+            let mut bottom = self.last_pos;
+            if self.last_pos.1 < self.pos.1 {
+                top = self.last_pos;
+                bottom = self.pos;
+            }
+
+            if top.1 != bottom.1 {
+                let len = buf.content[top.1].len() - top.0;
+                buf.attrs.insert((
+                    top.0,
+                    top.1,
+                    buffer::Attr {
+                        size: len,
+                        color: Some(colors::HIGHLIGHT),
+                        flags: None,
+                        link: None,
+                    },
+                ));
+
+                buf.attrs.insert((
+                    0,
+                    bottom.1,
+                    buffer::Attr {
+                        size: bottom.0,
+                        color: Some(colors::HIGHLIGHT),
+                        flags: None,
+                        link: None,
+                    },
+                ));
+
+                for x in (top.1 + 1)..bottom.1 {
+                    let len = buf.content[x].len();
+                    buf.attrs.insert((
+                        0,
+                        x,
+                        buffer::Attr {
+                            size: len,
+                            color: Some(colors::HIGHLIGHT),
+                            flags: None,
+                            link: None,
+                        },
+                    ));
+                }
+            } else {
+                buf.attrs.insert((
+                    min(top.0, bottom.0),
+                    top.1,
+                    buffer::Attr {
+                        size: max(top.0, bottom.0) - min(top.0, bottom.0),
+                        color: Some(colors::HIGHLIGHT),
+                        flags: None,
+                        link: None,
+                    },
+                ));
+            }
+
+            self.window.clear();
+            buf.write(
+                &self.window,
+                self.drawing_pos.1,
+                self.drawing_pos.0,
+                (
+                    (self.window.get_max_x() - self.window.get_beg_x()) as usize,
+                    (self.window.get_max_y() - self.window.get_beg_y()) as usize,
+                ),
+            );
+
+            self.redraw = false;
+        }
+        self.window.mv(
+            (self.pos.1 - self.drawing_pos.1) as i32,
+            (self.pos.0 - self.drawing_pos.0) as i32,
+        );
         self.window.refresh();
     }
 
     pub fn run(&mut self, input: Input) -> bool {
         if unsafe { mode::ESCAPE } {
-            self.mode = DEFAULT_MODE;
-            unsafe { mode::ESCAPE = false; }
+            self.mode = Box::new(DEFAULT_MODE);
+            unsafe {
+                mode::ESCAPE = false;
+            }
         }
-        return (self.mode)(self, input);
+
+        return self.mode.proc(self, input);
     }
 }

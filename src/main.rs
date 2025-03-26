@@ -1,22 +1,24 @@
 extern crate pancurses;
+use ctrlc;
 use std::cell::RefCell;
 use std::env;
 use std::rc::Rc;
-use ctrlc;
 
 use pancurses::*;
 
 mod buffer;
+mod colors;
+mod mode;
+mod movement;
 mod run;
 mod settings;
 mod window;
-mod mode;
-mod movement;
 
 fn init_colors() {
     if has_colors() {
         start_color();
         use_default_colors();
+        colors::apply_theme(&colors::default_theme::th());
     }
 }
 
@@ -59,7 +61,6 @@ fn main() {
     let stdscr = initscr();
     noecho();
 
-
     if settings::COLOR {
         init_colors();
     }
@@ -71,7 +72,7 @@ fn main() {
         mode::ctrl_c();
     }) {
         Ok(_) => (),
-        Err(x) => panic!("{:?}", x)
+        Err(x) => panic!("{:?}", x),
     };
 
     init_bufs(&mut buffers, env::args().nth(1), buffer::Flags::none);

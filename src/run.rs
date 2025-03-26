@@ -22,7 +22,7 @@ pub fn run(
     wins: &mut Vec<Win>,
 ) -> Result<(), RunErr> {
     'mainLoop: loop {
-        for win in wins.iter() {
+        for win in wins.iter_mut() {
             win.render();
         }
 

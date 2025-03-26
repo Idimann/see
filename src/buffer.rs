@@ -1,6 +1,7 @@
 use bitflags::bitflags;
 use pancurses::*;
-use std::vec::Vec;
+use sorted_vec::partial::SortedVec;
+use std::cmp::min;
 
 pub mod bindr;
 
@@ -12,15 +13,17 @@ bitflags! {
     }
 }
 
+#[derive(PartialEq, PartialOrd)]
 pub struct Attr {
-    pub color: i16,
-    pub flags: u32,
     pub size: usize,
+    pub color: Option<i16>,
+    pub flags: Option<u32>,
+    pub link: Option<usize>,
 }
 
 pub struct Buf {
     pub content: Vec<String>,
-    attrs: Vec<Attr>,
+    pub attrs: SortedVec<(usize, usize, Attr)>,
     flags: Flags,
     bind: Box<dyn bindr::Bindr>,
 }
@@ -33,7 +36,7 @@ impl Buf {
                 .split_inclusive('\n')
                 .map(|x| x.to_string())
                 .collect(),
-            attrs: vec![],
+            attrs: SortedVec::new(),
             flags: flag,
             bind: bin,
         };
@@ -42,7 +45,7 @@ impl Buf {
     pub fn new_load(flag: Flags, bin: Box<dyn bindr::Bindr>) -> Self {
         let mut ret = Buf {
             content: vec![String::from("")],
-            attrs: vec![],
+            attrs: SortedVec::new(),
             flags: flag,
             bind: bin,
         };
@@ -58,37 +61,35 @@ impl Buf {
         };
     }
 
-    //Unicode baby!!!!! (27 lines only btw) (don't touch the iterator shit, that took forever)
-    pub fn write(&self, win: &Window, pos: usize) {
-        let text = self.content[pos..].join("");
+    //This used to be 27 lines (sadge)
+    pub fn write(&self, win: &Window, pos: usize, xpos: usize, size: (usize, usize)) {
+        let contents = &self.content[pos..min(pos + size.1, self.content.len())];
 
-        let mut iter = text.char_indices();
-        let mut start = match iter.next() {
-            Some((x, _)) => x,
-            None => return,
-        };
-
-        for c in self.attrs.iter() {
-            win.attrset(c.flags);
-            win.color_set(c.color);
-            match iter.nth(c.size - 1) {
-                Some((end, _)) => {
-                    win.addstr(&text[start..end]);
-                    start = end;
-                }
-                None => {
-                    win.addstr(&text[start..]);
-                    start = self.content.len();
-                    break;
-                }
-            };
+        for x in contents.iter() {
+            win.addstr(&x[xpos..min(xpos + size.0, x.len())]);
         }
 
-        if start < self.content.len() {
-            win.color_set(-1);
-            win.attrset(A_NORMAL);
+        for (x, y, a) in self.attrs.iter() {
+            if *y < pos || *y > pos + size.1 {
+                continue;
+            }
+            if *x < xpos || *x > xpos + size.0 {
+                continue;
+            }
 
-            win.addstr(&text[start..]);
+            win.mvchgat(
+                (y - pos) as i32,
+                (x - xpos) as i32,
+                a.size as i32,
+                match a.flags {
+                    Some(x) => x,
+                    None => A_NORMAL,
+                },
+                match a.color {
+                    Some(x) => x,
+                    None => 0,
+                },
+            );
         }
     }
 }

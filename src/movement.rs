@@ -11,64 +11,71 @@ impl Win {
         return self.line_len() - self.pos.0 - 1;
     }
 
-    pub fn move_backward(&mut self) -> bool {
+    pub fn move_backward(&mut self) -> (bool, bool) {
         if self.pos.0 != 0 {
             self.pos.0 -= 1;
             self.pos_x = self.pos.0;
-            return true;
+            return (false, true);
         }
 
-        if self.move_up() {
+        let mov = self.move_up();
+        if mov.1 {
             self.pos.0 = self.line_len() - 1;
             self.pos_x = self.pos.0;
-            return true;
+            return (mov.0, true);
         }
 
-        return false;
+        return (mov.0, false);
     }
 
-    pub fn move_forward(&mut self) -> bool {
+    pub fn move_forward(&mut self) -> (bool, bool) {
         if self.line_end_dist() != 0 {
             self.pos.0 += 1;
             self.pos_x = self.pos.0;
-            return true;
+            return (false, true);
         }
 
-        if self.move_down() {
+        let mov = self.move_down();
+        if mov.1 {
             self.pos.0 = 0;
             self.pos_x = self.pos.0;
-            return true;
+            return (mov.0, true);
         }
-        return false;
+
+        return (mov.0, false);
     }
 
-    pub fn move_up(&mut self) -> bool {
+    pub fn move_up(&mut self) -> (bool, bool) {
         if self.pos.1 == 0 {
-            return false;
+            return (false, false);
         }
         self.pos.1 -= 1;
         self.pos.0 = min(self.pos_x, self.line_len() - 1);
-        if self.pos.1 - self.drawing_pos < settings::PAD && self.drawing_pos > 0 {
-            self.drawing_pos -= 1;
+        if self.pos.1 - self.drawing_pos.1 < settings::PAD && self.drawing_pos.1 > 0 {
+            self.drawing_pos.1 -= 1;
+            return (true, true);
         }
-        return true;
+
+        return (false, true);
     }
 
-    pub fn move_down(&mut self) -> bool {
+    pub fn move_down(&mut self) -> (bool, bool) {
         if self.pos.1 == self.buf.borrow().content.len() - 1 {
-            return false;
+            return (false, false);
         }
         self.pos.1 += 1;
         self.pos.0 = min(self.pos_x, self.line_len() - 1);
-        if self.pos.1 - self.drawing_pos
+        if self.pos.1 - self.drawing_pos.1
             >= (self.window.get_max_y() - self.window.get_beg_y()) as usize - settings::PAD
-            && self.drawing_pos
+            && self.drawing_pos.1
                 < self.buf.borrow().content.len()
                     - (self.window.get_max_y() - self.window.get_beg_y()) as usize
         {
-            self.drawing_pos += 1;
+            self.drawing_pos.1 += 1;
+            return (true, true);
         }
-        return true;
+
+        return (false, true);
     }
 
     pub fn move_end(&mut self) {
@@ -92,13 +99,23 @@ impl Win {
         };
     }
 
-    pub fn skip_whitespace(&mut self, reverse: bool) {
+    pub fn skip_whitespace(&mut self, reverse: bool) -> bool {
+        let mut done = false;
+
         while self.is_whitespace() {
             if reverse {
-                self.move_backward();
+                if !self.move_backward().1 {
+                    break;
+                }
             } else {
-                self.move_forward();
+                if !self.move_forward().1 {
+                    break;
+                }
             }
+
+            done = true;
         }
+
+        return done;
     }
 }
