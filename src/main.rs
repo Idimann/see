@@ -39,21 +39,24 @@ fn init_bufs(
 
 fn init_windows(
     buffers: &Vec<Rc<RefCell<buffer::Buf>>>,
-    windows: &mut Vec<window::Win>,
+    windows: &mut Vec<(Box<dyn mode::Mod>, window::Win)>,
     scr: &Window,
 ) {
     let (y_size, x_size) = scr.get_max_yx();
     let (y_pos, x_pos) = scr.get_beg_yx();
 
-    windows.push(window::Win::new(
-        match scr.subwin(y_size, x_size, y_pos, x_pos) {
-            Ok(x) => x,
-            Err(_) => return,
-        },
-        match buffers.first() {
-            Some(x) => x.clone(),
-            None => return,
-        },
+    windows.push((
+        Box::new(window::DEFAULT_MODE),
+        window::Win::new(
+            match scr.subwin(y_size, x_size, y_pos, x_pos) {
+                Ok(x) => x,
+                Err(_) => return,
+            },
+            match buffers.first() {
+                Some(x) => x.clone(),
+                None => return,
+            },
+        ),
     ));
 }
 
@@ -66,7 +69,7 @@ fn main() {
     }
 
     let mut buffers: Vec<Rc<RefCell<buffer::Buf>>> = Vec::new();
-    let mut windows: Vec<window::Win> = Vec::new();
+    let mut windows: Vec<(Box<dyn mode::Mod>, window::Win)> = Vec::new();
 
     match ctrlc::set_handler(|| {
         mode::ctrl_c();
@@ -81,7 +84,7 @@ fn main() {
     stdscr.keypad(true);
     let _ = run::run(&stdscr, &mut buffers, &mut windows);
 
-    for win in windows {
+    for (_, win) in windows {
         win.window.delwin();
     }
 

@@ -1,4 +1,5 @@
 use crate::buffer::Buf;
+use crate::mode::Mod;
 use crate::window::Win;
 use pancurses::*;
 use std::cell::RefCell;
@@ -19,10 +20,10 @@ impl Display for RunErr {
 pub fn run(
     std: &Window,
     bufs: &mut Vec<Rc<RefCell<Buf>>>,
-    wins: &mut Vec<Win>,
+    wins: &mut Vec<(Box<dyn Mod>, Win)>,
 ) -> Result<(), RunErr> {
     'mainLoop: loop {
-        for win in wins.iter_mut() {
+        for (_, win) in wins.iter_mut() {
             win.render();
         }
 
@@ -31,8 +32,8 @@ pub fn run(
             None => continue,
         };
 
-        for win in wins.iter_mut() {
-            if win.run(input) {
+        for (mode, win) in wins.iter_mut() {
+            if win.run(mode, input) {
                 break 'mainLoop;
             }
         }

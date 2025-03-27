@@ -80,12 +80,12 @@ impl Mod for Insert {
     }
 }
 
-//u => Up
-//d => Down
-//f => Forward
-//b => Backward
-//s => Start of line
-//e => End of line
+//Done: u => Up
+//Done: d => Down
+//Done: f => Forward
+//Done: b => Backward
+//Done: s => Start of line after whitespace
+//Done: e => End of line with whitespace
 //o => to Other bracket
 //p => set Point (mark in vim)
 //j => Jump to point
@@ -97,7 +97,9 @@ impl Mod for Insert {
 //n => next Match (while searching)
 //; => command mode (like vims ':')
 //v => Vertical keep mode (visual line mode in vim) (just like keep mode with lines)
-//Still unmapped => q, r, t, y, i, g, z, x, c, all symbols and capital letters
+//t => go to next Text block (word)
+//r => reverse go to next Text block (word)
+//Still unmapped => q, y, i, g, z, x, c, all symbols and capital letters
 pub struct Select;
 impl Mod for Select {
     fn proc(&mut self, win: &mut Win, input: Input) -> bool {

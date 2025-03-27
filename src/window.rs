@@ -9,7 +9,7 @@ use std::cmp::max;
 use std::cmp::min;
 use std::rc::Rc;
 
-const DEFAULT_MODE: mode::Select = mode::Select;
+pub const DEFAULT_MODE: mode::Select = mode::Select;
 
 pub struct Win {
     pub window: Window,
@@ -18,7 +18,6 @@ pub struct Win {
     pub last_pos: (usize, usize),
     pub pos: (usize, usize),
     pub pos_x: usize,
-    pub mode: Box<dyn Mod>,
     pub redraw: bool,
 }
 
@@ -31,7 +30,6 @@ impl Win {
             last_pos: (0, 0),
             pos: (0, 0),
             pos_x: 0,
-            mode: Box::new(mode::Insert),
             redraw: true,
         };
     }
@@ -43,18 +41,20 @@ impl Win {
 
             let mut top = self.pos;
             let mut bottom = self.last_pos;
+            let mut changed = false; //All of this is just so it doesn't override the cursor
             if self.last_pos.1 < self.pos.1 {
                 top = self.last_pos;
                 bottom = self.pos;
+                changed = true;
             }
 
             if top.1 != bottom.1 {
                 let len = buf.content[top.1].len() - top.0;
                 buf.attrs.insert((
-                    top.0,
+                    top.0 + if changed { 0 } else { 1 },
                     top.1,
                     buffer::Attr {
-                        size: len,
+                        size: len - if changed { 0 } else { 1 },
                         color: Some(colors::HIGHLIGHT),
                         flags: None,
                         link: None,
@@ -65,7 +65,7 @@ impl Win {
                     0,
                     bottom.1,
                     buffer::Attr {
-                        size: bottom.0,
+                        size: bottom.0 + if changed { 0 } else { 1 },
                         color: Some(colors::HIGHLIGHT),
                         flags: None,
                         link: None,
@@ -87,7 +87,7 @@ impl Win {
                 }
             } else {
                 buf.attrs.insert((
-                    min(top.0, bottom.0),
+                    min(self.pos.0 + 1, self.last_pos.0),
                     top.1,
                     buffer::Attr {
                         size: max(top.0, bottom.0) - min(top.0, bottom.0),
@@ -118,14 +118,14 @@ impl Win {
         self.window.refresh();
     }
 
-    pub fn run(&mut self, input: Input) -> bool {
+    pub fn run(&mut self, mode: &mut Box<dyn Mod>, input: Input) -> bool {
         if unsafe { mode::ESCAPE } {
-            self.mode = Box::new(DEFAULT_MODE);
+            *mode = Box::new(DEFAULT_MODE);
             unsafe {
                 mode::ESCAPE = false;
             }
         }
 
-        return self.mode.proc(self, input);
+        return mode.proc(self, input);
     }
 }
